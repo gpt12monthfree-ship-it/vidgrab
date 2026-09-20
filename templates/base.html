@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="VidGrab Pro — premium universal video downloader.">
+<title>{% block title %}VidGrab Pro{% endblock %}</title>
+
+<script>
+  (function () {
+    var t = localStorage.getItem('vg-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬇️</text></svg>">
+</head>
+<body>
+
+<div class="page-loader" id="pageLoader">
+  <div class="loader-ring"></div>
+</div>
+
+<div class="aurora" aria-hidden="true">
+  <span class="orb orb-a"></span>
+  <span class="orb orb-b"></span>
+  <span class="orb orb-c"></span>
+  <div class="grid-overlay"></div>
+</div>
+
+{% block body %}{% endblock %}
+
+<div id="toasts" class="toast-stack" aria-live="polite"></div>
+
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+<script>
+  addEventListener('load', () => {
+    const l = document.getElementById('pageLoader');
+    setTimeout(() => { l.classList.add('done'); setTimeout(() => l.remove(), 600); }, 250);
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,5 @@
+flask
+yt-dlp
+flask-login
+werkzeug
+gunicorn

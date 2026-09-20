@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Sign in · VidGrab Pro{% endblock %}
+
+{% block body %}
+<main class="auth-shell">
+  <section class="auth-panel glass">
+    <a href="/" class="brand brand--center">
+      <span class="brand-mark"><i class="fa-solid fa-bolt"></i></span>
+      <span class="brand-name">VidGrab<span class="brand-accent">Pro</span></span>
+    </a>
+
+    <h1 class="auth-heading">Welcome back</h1>
+    <p class="auth-sub">Sign in to sync your download library</p>
+
+    <form id="authForm" class="stack" novalidate>
+      <div class="field">
+        <label for="username">Username or email</label>
+        <div class="control">
+          <i class="fa-regular fa-user"></i>
+          <input id="username" type="text" placeholder="yourname" autocomplete="username" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="control">
+          <i class="fa-solid fa-lock"></i>
+          <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+          <button type="button" class="ghost-icon" data-reveal="password" aria-label="Show password">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit" id="submitBtn">
+        <span class="btn-label">Sign in</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </form>
+
+    <div class="divider"><span>or</span></div>
+
+    <a href="/guest" class="btn btn-ghost btn-block">
+      <i class="fa-solid fa-user-secret"></i> Continue as guest
+    </a>
+
+    <p class="auth-foot">New here? <a href="/register">Create an account</a></p>
+  </section>
+</main>
+
+<button class="theme-fab" data-theme-toggle aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-reveal]').forEach(b=>{
+  b.onclick=()=>{const i=document.getElementById(b.dataset.reveal);
+    i.type = i.type==='password' ? 'text':'password';
+    b.innerHTML = i.type==='password' ? '<i class="fa-regular fa-eye"></i>':'<i class="fa-regular fa-eye-slash"></i>';};
+});
+
+document.getElementById('authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.classList.add('is-loading'); btn.disabled = true;
+  try {
+    const r = await fetch('/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        username: username.value.trim(),
+        password: password.value
+      })
+    });
+    const d = await r.json();
+    if (d.ok) { toast('Welcome back 👋','success'); setTimeout(()=>location.href=d.redirect,400); }
+    else { toast(d.error,'error'); }
+  } catch { toast('Network error. Try again.','error'); }
+  btn.classList.remove('is-loading'); btn.disabled = false;
+});
+</script>
+{% endblock %}

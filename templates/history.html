@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}My Library · VidGrab Pro{% endblock %}
+
+{% block body %}
+<header class="topbar">
+  <div class="shell topbar-inner">
+    <a href="/" class="brand">
+      <span class="brand-mark"><i class="fa-solid fa-bolt"></i></span>
+      <span class="brand-name">VidGrab<span class="brand-accent">Pro</span></span>
+    </a>
+    <nav class="topnav">
+      <a href="/">Downloader</a>
+      <a href="/history" class="is-active">Library</a>
+    </nav>
+    <div class="topbar-actions">
+      <button class="icon-btn" data-theme-toggle aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+      <a href="/logout" class="icon-btn danger" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></a>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="shell">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Your archive</p>
+        <h1 class="page-title">Download library</h1>
+        <p class="muted">Signed in as <b>{{ username }}</b></p>
+      </div>
+      {% if history %}
+      <button class="btn btn-danger-soft" id="clearAll"><i class="fa-regular fa-trash-can"></i> Clear all</button>
+      {% endif %}
+    </div>
+
+    <div class="stat-row">
+      <div class="stat glass">
+        <div class="stat-ic i-violet"><i class="fa-solid fa-download"></i></div>
+        <div><b class="mono">{{ stats.total }}</b><span>Total downloads</span></div>
+      </div>
+      <div class="stat glass">
+        <div class="stat-ic i-cyan"><i class="fa-solid fa-film"></i></div>
+        <div><b class="mono">{{ stats.video }}</b><span>Videos</span></div>
+      </div>
+      <div class="stat glass">
+        <div class="stat-ic i-amber"><i class="fa-solid fa-headphones"></i></div>
+        <div><b class="mono">{{ stats.audio }}</b><span>Audio files</span></div>
+      </div>
+    </div>
+
+    {% if history %}
+    <div class="lib-list">
+      {% for it in history %}
+      <article class="lib-item glass" data-id="{{ it.id }}">
+        <div class="lib-thumb">
+          <img src="{{ it.thumbnail }}" alt="" loading="lazy"
+               onerror="this.style.display='none';this.parentElement.classList.add('no-img')">
+          <span class="type-dot {{ it.media_type }}">
+            <i class="fa-solid fa-{{ 'film' if it.media_type=='video' else 'music' }}"></i>
+          </span>
+        </div>
+        <div class="lib-info">
+          <h3>{{ it.title }}</h3>
+          <div class="lib-tags">
+            <span class="tag tag-accent">{{ it.platform }}</span>
+            <span class="tag">{{ it.quality }}</span>
+            <span class="tag">{{ it.file_size }}</span>
+            <span class="tag tag-ghost"><i class="fa-regular fa-clock"></i> {{ it.created_at[:16] }}</span>
+          </div>
+        </div>
+        <div class="lib-actions">
+          <a class="icon-btn" href="{{ it.url }}" target="_blank" rel="noopener" title="Open source">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+          <button class="icon-btn danger del" data-id="{{ it.id }}" title="Remove">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty glass">
+      <div class="empty-ic"><i class="fa-regular fa-folder-open"></i></div>
+      <h3>Your library is empty</h3>
+      <p class="muted">Downloads you make will appear here automatically.</p>
+      <a href="/" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Download something</a>
+    </div>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.del').forEach(b => {
+  b.onclick = async () => {
+    const id = b.dataset.id;
+    const r = await fetch('/api/history/' + id, { method: 'DELETE' });
+    if (r.ok) {
+      const el = document.querySelector(`.lib-item[data-id="${id}"]`);
+      el.style.transition = '.3s'; el.style.opacity = 0; el.style.transform = 'translateX(24px)';
+      setTimeout(() => el.remove(), 300);
+      toast('Removed from library', 'success');
+    }
+  };
+});
+
+const clr = document.getElementById('clearAll');
+if (clr) clr.onclick = async () => {
+  if (!confirm('Remove every item from your library? This cannot be undone.')) return;
+  const r = await fetch('/api/history', { method: 'DELETE' });
+  if (r.ok) { toast('Library cleared', 'success'); setTimeout(() => location.reload(), 500); }
+};
+</script>
+{% endblock %}
