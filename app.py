@@ -176,7 +176,13 @@ def api_inspect():
     if not url.startswith(("http://", "https://")):
         return jsonify(error="Please enter a valid link (must start with http)"), 400
 
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True}
+    opts = {
+    "quiet": True,
+    "no_warnings": True,
+    "skip_download": True,
+    "noplaylist": True,
+    "js_runtimes": ["deno"],
+}
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -264,6 +270,7 @@ def api_download():
     if media_type == "audio":
         opts = {
             "format": "bestaudio/best",
+            "js_runtimes": ["deno"],
             "outtmpl": out_tpl,
             "progress_hooks": [hook],
             "quiet": True,
@@ -280,6 +287,7 @@ def api_download():
         opts = {
             "format": selector,
             "outtmpl": out_tpl,
+            "js_runtimes": ["deno"],
             "progress_hooks": [hook],
             "merge_output_format": "mp4",
             "quiet": True,
