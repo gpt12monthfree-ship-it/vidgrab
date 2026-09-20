@@ -102,25 +102,33 @@ def clean_error(msg):
 
 
 def get_ffmpeg_location():
-    """Return an explicit ffmpeg/ffprobe directory if one is bundled, else None.
+    """Return a yt-dlp-compatible ffmpeg location, else None.
+
+    yt-dlp's FFmpegPostProcessor accepts either a directory containing
+    executables literally named ``ffmpeg``/``ffprobe``, or an explicit path
+    to an ffmpeg binary (from which it derives the ffprobe name). Passing a
+    bare directory whose binaries have versioned names (e.g. imageio's
+    ``ffmpeg-win-x86_64-v7.1.exe``) makes yt-dlp report "ffmpeg is not
+    installed", so we always return a concrete file path when possible.
 
     Priority:
-      1. FFMPEG_LOCATION env (Render/admin override)
-      2. imageio_ffmpeg bundled static binary (works on Render without apt)
-      3. FFmpeg found on PATH (local dev)
+      1. FFMPEG_LOCATION env (explicit override; file or dir)
+      2. System FFmpeg on PATH (local dev — ships both ffmpeg and ffprobe)
+      3. imageio_ffmpeg bundled static binary path (works on Render)
     """
     override = os.environ.get("FFMPEG_LOCATION")
-    if override and os.path.isdir(override):
+    if override and os.path.exists(override):
         return override
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        return ffmpeg
     try:
         import imageio_ffmpeg
         binary = imageio_ffmpeg.get_ffmpeg_exe()
-        if binary:
-            return os.path.dirname(binary)
+        if binary and os.path.exists(binary):
+            return binary
     except Exception:
-        pass  # imageio-ffmpeg not installed — fall through to PATH
-    if shutil.which("ffmpeg"):
-        return shutil.which("ffmpeg")
+        pass  # imageio-ffmpeg not installed — nothing further to try
     return None
 
 
