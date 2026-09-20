@@ -4,6 +4,7 @@ VidGrab Pro — Application Server
 
 import os
 import re
+import shutil
 import uuid
 import threading
 from datetime import timedelta
@@ -92,6 +93,61 @@ def safe_name(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name)[:120]
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def clean_error(msg):
+    """Strip ANSI color codes and truncate to first line for JSON display."""
+    return _ANSI_RE.sub("", msg).split("\n")[0].strip()[:200]
+
+
+def get_ffmpeg_location():
+    """Return an explicit ffmpeg/ffprobe directory if one is bundled, else None.
+
+    Priority:
+      1. FFMPEG_LOCATION env (Render/admin override)
+      2. imageio_ffmpeg bundled static binary (works on Render without apt)
+      3. FFmpeg found on PATH (local dev)
+    """
+    override = os.environ.get("FFMPEG_LOCATION")
+    if override and os.path.isdir(override):
+        return override
+    try:
+        import imageio_ffmpeg
+        binary = imageio_ffmpeg.get_ffmpeg_exe()
+        if binary:
+            return os.path.dirname(binary)
+    except Exception:
+        pass  # imageio-ffmpeg not installed — fall through to PATH
+    if shutil.which("ffmpeg"):
+        return shutil.which("ffmpeg")
+    return None
+
+
+def base_ydl_opts(**extra):
+    """Shared yt-dlp options. Keeps extraction robust against YouTube bot
+    detection and soft-blocks."""
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "js_runtimes": {},
+        "ffmpeg_location": get_ffmpeg_location(),
+        "retries": 5,
+        "fragment_retries": 5,
+        "extractor_retries": 3,
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        },
+    }
+    opts.update(extra)
+    return opts
+
+
 # ──────────────────────────── Pages ────────────────────────────
 
 @app.route("/")
@@ -176,20 +232,13 @@ def api_inspect():
     if not url.startswith(("http://", "https://")):
         return jsonify(error="Please enter a valid link (must start with http)"), 400
 
-    opts = {
-    "quiet": True,
-    "no_warnings": True,
-    "skip_download": True,
-    "noplaylist": True,
-    "js_runtimes": ["deno"],
-}
+    opts = base_ydl_opts(skip_download=True)
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as e:
-        msg = str(e).split("\n")[0][:180]
-        return jsonify(error=f"Could not read this link. {msg}"), 400
+        return jsonify(error=f"Could not read this link. {clean_error(str(e))}"), 400
 
     if info.get("_type") == "playlist":
         info = (info.get("entries") or [{}])[0]
@@ -268,32 +317,24 @@ def api_download():
     out_tpl = os.path.join(DOWNLOAD_DIR, f"{job_id}__%(title).80s.%(ext)s")
 
     if media_type == "audio":
-        opts = {
-            "format": "bestaudio/best",
-            "js_runtimes": ["deno"],
-            "outtmpl": out_tpl,
-            "progress_hooks": [hook],
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "postprocessors": [{
+        opts = base_ydl_opts(
+            format="bestaudio/best",
+            outtmpl=out_tpl,
+            progress_hooks=[hook],
+            postprocessors=[{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-        }
+        )
     else:
         selector = f"{fmt_id}+bestaudio/{fmt_id}/best" if fmt_id != "best" else "bestvideo+bestaudio/best"
-        opts = {
-            "format": selector,
-            "outtmpl": out_tpl,
-            "js_runtimes": ["deno"],
-            "progress_hooks": [hook],
-            "merge_output_format": "mp4",
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-        }
+        opts = base_ydl_opts(
+            format=selector,
+            outtmpl=out_tpl,
+            progress_hooks=[hook],
+            merge_output_format="mp4",
+        )
 
     def worker():
         try:
@@ -331,7 +372,7 @@ def api_download():
                 db.add_history(user_id, media_type=media_type, file_size=size, **meta)
 
         except Exception as e:
-            JOBS[job_id] = {"state": "error", "error": str(e).split("\n")[0][:200]}
+            JOBS[job_id] = {"state": "error", "error": clean_error(str(e))}
 
     threading.Thread(target=worker, daemon=True).start()
     return jsonify(job=job_id)
@@ -362,6 +403,35 @@ def api_del_history(item_id):
 def api_clear_history():
     db.clear_history(current_user.id)
     return jsonify(ok=True)
+
+
+# ──────────────────────────── Error handlers ────────────────────────────
+
+def _api_error(status, message):
+    """Return a JSON error when the request targets an API route, HTML otherwise."""
+    if request.path.startswith("/api/"):
+        return jsonify(error=message), status
+    return message, status
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return _api_error(404, "Not found")
+
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return _api_error(405, "Method not allowed")
+
+
+@app.errorhandler(413)
+def too_large(e):
+    return _api_error(413, "Request too large")
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return _api_error(500, "Internal server error. Please try again.")
 
 
 # ──────────────────────────── Run ────────────────────────────

@@ -3,3 +3,7 @@ yt-dlp[default]
 flask-login
 werkzeug
 gunicorn
+# Bundles a static ffmpeg/ffprobe binary (Linux/macOS/Windows) so yt-dlp can
+# merge video+audio streams and extract MP3 even where ffmpeg is not installed
+# system-wide (e.g. Render free tier).
+imageio-ffmpeg
